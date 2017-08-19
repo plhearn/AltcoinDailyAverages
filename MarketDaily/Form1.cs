@@ -66,6 +66,10 @@ namespace MarketDaily
         List<snapShot> snapShots = new List<snapShot>();
         List<chartData> charts = new List<chartData>();
 
+        List<double> emasShort = new List<double>();
+        List<double> emasMid = new List<double>();
+        List<double> emasLong = new List<double>();
+        List<double> smasLong = new List<double>();
 
         public Form1()
         {
@@ -122,7 +126,7 @@ namespace MarketDaily
 
             try
             {
-                responseString = await client.GetStringAsync("https://min-api.cryptocompare.com/data/histoday?fsym=" + symbol + "&tsym=BTC&limit=60&aggregate=3&e=CCCAGG");
+                responseString = await client.GetStringAsync("https://min-api.cryptocompare.com/data/histoday?fsym=" + symbol + "&tsym=BTC&limit=300&aggregate=1&e=CCCAGG");
             }
             catch (TaskCanceledException e1)
             {
@@ -384,7 +388,7 @@ namespace MarketDaily
                 }
 
 
-                if (c.volume > 300 &&
+                if (c.volume > 30 &&
                     !c.name.Contains("ETH-") &&
                     !c.name.Contains("USDT-") &&
                     !c.name.Contains("CNY-"))
@@ -537,10 +541,54 @@ namespace MarketDaily
                     ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line,
                 };
 
+                var series2 = new System.Windows.Forms.DataVisualization.Charting.Series
+                {
+                    Name = charts[i].symbol + " emaShort",
+                    Color = Color.Blue,
+                    BorderWidth = 1,
+                    IsXValueIndexed = false,
+                    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line,
+                };
+
+                var series3 = new System.Windows.Forms.DataVisualization.Charting.Series
+                {
+                    Name = charts[i].symbol + " emaMid",
+                    Color = Color.Green,
+                    BorderWidth = 1,
+                    IsXValueIndexed = false,
+                    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line,
+                };
+
+                var series4 = new System.Windows.Forms.DataVisualization.Charting.Series
+                {
+                    Name = charts[i].symbol + " emaLong",
+                    Color = Color.Yellow,
+                    BorderWidth = 1,
+                    IsXValueIndexed = false,
+                    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line,
+                };
+
+                var series5 = new System.Windows.Forms.DataVisualization.Charting.Series
+                {
+                    Name = charts[i].symbol + " smaLong",
+                    Color = Color.Red,
+                    BorderWidth = 1,
+                    IsXValueIndexed = false,
+                    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line,
+                };
+
+                getMAs(charts[i].points);
+
                 for (int j = 0; j < charts[i].points.Count; j++)
                 {
-                    series1.Points.AddXY(j, charts[i].points[j].price);
-
+                    if(charts[i].points[j].price > 0)
+                    {
+                        series1.Points.AddXY(j, charts[i].points[j].price);
+                        series2.Points.AddXY(j, emasShort[j]);
+                        series3.Points.AddXY(j, emasMid[j]);
+                        series4.Points.AddXY(j, emasLong[j]);
+                        series5.Points.AddXY(j, smasLong[j]);
+                    }
                 }
                 
                 foreach (DataGridViewRow row in dataGridView1.Rows)
@@ -549,7 +597,13 @@ namespace MarketDaily
 
                     if (row.Cells[0].Value.ToString() == series1.Name &&
                         chk.Value == chk.TrueValue)
+                    {
                         chart1.Series.Add(series1);
+                        chart1.Series.Add(series2);
+                        chart1.Series.Add(series3);
+                        chart1.Series.Add(series4);
+                        chart1.Series.Add(series5);
+                    }
                 }
             }
         }
@@ -565,6 +619,104 @@ namespace MarketDaily
             {
                 dataGridView1.CommitEdit(DataGridViewDataErrorContexts.Commit);
             }
+        }
+
+        private void getMAs(List<chartPoint> points)
+        {
+
+            emasShort.Clear();
+            double emasShortLength = 8;
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (i == points.Count - 1)
+                    i = i;
+
+                double divisor = 1;
+                double sma = 0;
+                for (int j = 0; j < emasShortLength; j++)
+                    sma += points[Math.Max(i - j, 0)].price;
+
+                sma /= emasShortLength;
+
+                double mult = 2 / (double)(emasShortLength + 1);
+
+                double ema = points[i].price;
+
+                if (emasShort.Count > 0)
+                    ema = (points[i].price * mult) + (emasShort[Math.Max(i - 1, 0)] * (1 - mult));
+
+                emasShort.Add(ema);
+            }
+
+            emasMid.Clear();
+            double emasMidLength = 21;
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (i == points.Count - 1)
+                    i = i;
+
+                double divisor = 1;
+                double sma = 0;
+                for (int j = 0; j < emasMidLength; j++)
+                    sma += points[Math.Max(i - j, 0)].price;
+
+                sma /= emasMidLength;
+
+                double mult = 2 / (double)(emasMidLength + 1);
+
+                double ema = points[i].price;
+
+                if (emasMid.Count > 0)
+                    ema = (points[i].price * mult) + (emasMid[Math.Max(i - 1, 0)] * (1 - mult));
+
+                emasMid.Add(ema);
+            }
+
+
+            emasLong.Clear();
+            double emasLongLength = 50;
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (i == points.Count - 1)
+                    i = i;
+
+                double divisor = 1;
+                double sma = 0;
+                for (int j = 0; j < emasLongLength; j++)
+                    sma += points[Math.Max(i - j, 0)].price;
+
+                sma /= emasLongLength;
+
+                double mult = 2 / (double)(emasLongLength + 1);
+                //mult =0.5f;
+
+                double ema = points[i].price;
+
+                if (emasLong.Count > 0)
+                    ema = (points[i].price * mult) + (emasLong[Math.Max(i - 1, 0)] * (1 - mult));
+
+                emasLong.Add(ema);
+            }
+
+            smasLong.Clear();
+            double smasLongLength = 200;
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (i == points.Count - 1)
+                    i = i;
+
+                double divisor = 1;
+                double sma = 0;
+                for (int j = 0; j < smasLongLength; j++)
+                    sma += points[Math.Max(i - j, 0)].price;
+
+                sma /= smasLongLength;
+                
+                smasLong.Add(sma);
+            }
+
         }
     }
 }
